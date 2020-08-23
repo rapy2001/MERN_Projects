@@ -27,25 +27,8 @@ const userSchema = new mongoose.Schema({
     friends:[{
         type:mongoose.Schema.Types.ObjectId
     }],
-    friendRequests:[{
-        userId:{
-            type:mongoose.Schema.Types.ObjectId
-        },
-        condition:{
-            type:Boolean
-        }
-    }],
     notifications:[{
-        flag:Number,
-        userId:{
-            type:mongoose.Schema.Types.ObjectId
-        },
-        screamId:{
-            type:mongoose.Schema.Types.ObjectId
-        },
-        checked:{Type:
-            Boolean
-        }
+        type:mongoose.Schema.Types.ObjectId
     }]
 });
 

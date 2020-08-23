@@ -9,10 +9,13 @@ mongoose.connection.once("open",function(){
 });
 const User = require("./Models/User");
 const Scream  = require("./Models/Scream");
+const Notification = require("./Models/Notification");
 
 const app =express();
 app.use(express.json());
 app.use(cors());
+const seed = require("./Seed/Seed");
+seed();
 
 app.post("/api/user/register",function(req,res){
     let flg = 0;
@@ -57,9 +60,7 @@ app.post("/api/user/register",function(req,res){
             })
             .catch((err)=>{
                 console.log("Error while creating the password hash");
-                res.status(200).json({
-                    flag:0
-                })
+                res.status(500).json(err);
             })
         }
     })
@@ -75,17 +76,23 @@ app.post("/api/user/login",function(req,res){
     .then((users)=>{
         for(let i = 0; i<users.length; i++)
         {
-            if(users.username === req.body.user.username)
+            if(users[i].username === req.body.user.username)
             {
                 flg = 0;
-                if(bcrypt.compareSync(req.body.user.password))
+                if(bcrypt.compareSync(req.body.user.password,users[i].password))
                 {
+                    // console.log("working");
                     res.status(200).json({
+                        user:{
+                            userId:users[i]._id,
+                            username:users[i].username
+                        },
                         flag:1
                     })
                 }
                 else
                 {
+                    // console.log("working here");
                     res.status(200).json({
                         flag:0
                     })
@@ -95,6 +102,7 @@ app.post("/api/user/login",function(req,res){
         }
         if(flg === 1)
         {
+            // console.log("working here present");
             res.status(200).json({
                 flag:-1
             })
@@ -107,25 +115,31 @@ app.post("/api/user/login",function(req,res){
 });
 
 app.post("/api/user/:id/sendFriendRequest",function(req,res){
-    User.findById(req.body.frndRequest.userId)
+    User.findById(req.body.userId)
     .then((user)=>{
-        user.frienRequests.push({
-            userId:req.params.id
-        })
-        user.notifications.push({
-            flag:2,
-            userId:req.params.id,
+        let notif = {
+            flag:1,
+            requestedUserId:req.params.id,
             screamId:"",
-            checked:false
-        })
-        user.save()
-        .then(()=>{
-            res.status(200).json({
-                flag:1
+            checked:false,
+            userId:user._id
+        }
+        Notification.create(notif)
+        .then((notif)=>{
+            user.notifications.push(notif._id);
+            user.save()
+            .then(()=>{
+                res.status(200).json({
+                    flag:1
+                })
+            })
+            .catch((err)=>{
+                console.log("Error while saving the user during friend Request");
             })
         })
         .catch((err)=>{
-            console.log("Error while saving the user during sending the friend Requests");
+            console.log("Error while creating the notification for friend Request");
+            res.status(500).json(err);
         })
     })
     .catch((err)=>{
@@ -159,24 +173,41 @@ app.post("/api/user/:id/scream/create",function(req,res){
                     .then((friend)=>{
                         let notif = {
                             flag:1,
-                            userId:"",
+                            requestedUserId:"",
                             screamId:scream._id,
-                            checked:false
+                            checked:false,
+                            userId:friend._id
                         }
-                        friend.notifications.push(notif);
-                        friend.save()
-                        .then(()=>{
-                            if( i === user.friends.length)
-                            {
-                                res.status(200).json({
-                                    flag:1
-                                })
-                            }
+                        Notification.create(notif)
+                        .then((notif)=>{
+                            friend.notifications.push(notif._id);
+                            friend.save()
+                            .then(()=>{
+                                if( i === user.friends.length)
+                                {
+                                    user.screams.push(scream._id);
+                                    user.save()
+                                    .then(()=>{
+                                        res.status(200).json({
+                                            flag:1
+                                        })
+                                    })
+                                    .catch((err)=>{
+                                        console.log("Error while saving the scream to user");
+                                        res.status(500).json(err);
+                                    })
+                                }
+                            })
+                            .catch((err)=>{
+                                console.log("Error while saving scream notification to user friend");
+                                res.status(500).json(err);
+                            })
                         })
                         .catch((err)=>{
-                            console.log("Error while saving scream notification to user friend");
+                            console.log("Error while creating the notification");
                             res.status(500).json(err);
                         })
+                        
                     })
                     .catch((err)=>{
                         console.log("Error while finding a friend of the user during sending new scream notification");
